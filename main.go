@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 )
 
@@ -10,9 +12,9 @@ import (
 // go env -w GOPROXY=https://goproxy.cn,direct
 
 type Account struct {
-	Name string
-	Pwd string
-	Balance float64
+	Name string `json:"name"`
+	Pwd string `json:"pwd"`
+	Balance float64 `json:"balance"`
 }
 
 //
@@ -24,7 +26,43 @@ func NewAccount(name, pwd string) Account {
 	}
 }
 
+//存放注册的账号
 var allAccounts = make(map[string]Account, 100)
+
+
+func Login() {
+	var (
+		name string
+		pwd string
+		account Account
+
+	)
+	fmt.Print("请输入用户名:")
+	fmt.Scanln(&name)
+	fmt.Print("请输入密码:")
+	fmt.Scanln(&pwd)
+	//判断name是不是注册了
+	_, err := os.Stat("./accounts/" + name + ".json")
+	if os.IsNotExist(err) {
+		fmt.Println("当前用户不存在")
+		return
+	}
+	filepath := "./accounts/" + name + ".json"
+	data, _ := ioutil.ReadFile(filepath)
+	json.Unmarshal(data, &account)
+	/*account, ok := allAccounts[name]
+	if !ok {
+		fmt.Println("用户名不存在")
+		return
+	}*/
+	//再次判断用户输入的密码和注册时保存的密码是否一致
+	if pwd != account.Pwd {
+		fmt.Println("密码不正确...")
+		return
+	}
+
+	fmt.Println("登录成功...")
+}
 
 func Register() {
 	var (
@@ -45,13 +83,19 @@ func Register() {
 		return
 	}
 
-	_, ok := allAccounts[user]
-	if ok {
+	filepath := "./accounts/" + user + ".json"
+	_, err := os.Stat(filepath)
+	
+	if !os.IsNotExist(err) {
 		fmt.Println("账号已经存在!请换一个账号再注册")
 		return
 	}
 
+
 	newAccounts := NewAccount(user, pwd)
+	data, _ := json.Marshal(newAccounts)
+	os.WriteFile("./accounts/" + user + ".json", data, 0666)
+	
 	allAccounts[user] = newAccounts
 	
 
@@ -76,9 +120,9 @@ func main() {
 		fmt.Scanln(&choice)
 		switch(choice) {
 		case 1:
-			fmt.Println("登录")
+			Login()
 		case 2:
-			fmt.Println("注册")
+			Register()
 		case 3:
 			fmt.Println("余额")
 		case 4:
