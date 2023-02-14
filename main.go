@@ -5,17 +5,29 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
+	"youyu/utils"
 )
 
 //go mod init 名字
 
 // go env -w GOPROXY=https://goproxy.cn,direct
 
+//明细记录
+type Detail struct {
+	Kind string `json:"kind"`
+	Amounts float64 `json:"amounts"`
+	Message string `json:"message"`
+}
+
 type Account struct {
 	Name string `json:"name"`
 	Pwd string `json:"pwd"`
 	Balance float64 `json:"balance"`
+	Details []Detail `json:"details"`
 }
+
+var currentAccount Account
 
 //
 func NewAccount(name, pwd string) Account {
@@ -23,6 +35,7 @@ func NewAccount(name, pwd string) Account {
 		Name:name,
 		Pwd:pwd,
 		Balance: 0,
+		
 	}
 }
 
@@ -42,21 +55,21 @@ func Login() {
 	fmt.Print("请输入密码:")
 	fmt.Scanln(&pwd)
 	//判断name是不是注册了
-	_, err := os.Stat("./accounts/" + name + ".json")
-	if os.IsNotExist(err) {
-		fmt.Println("当前用户不存在")
+	ok, filepath := utils.IsExists(name)
+	if !ok {
+		fmt.Println("用户名不存在")
 		return
 	}
-	filepath := "./accounts/" + name + ".json"
 	data, _ := ioutil.ReadFile(filepath)
 	json.Unmarshal(data, &account)
+	currentAccount = account
 	/*account, ok := allAccounts[name]
 	if !ok {
 		fmt.Println("用户名不存在")
 		return
 	}*/
 	//再次判断用户输入的密码和注册时保存的密码是否一致
-	if pwd != account.Pwd {
+	if utils.Hash(pwd) != account.Pwd {
 		fmt.Println("密码不正确...")
 		return
 	}
@@ -82,25 +95,102 @@ func Register() {
 		fmt.Println("两次密码输入不一致~请重新输入")
 		return
 	}
+	ok, filepath := utils.IsExists(user)
 
-	filepath := "./accounts/" + user + ".json"
-	_, err := os.Stat(filepath)
+	// filepath := "./accounts/" + user + ".json"
+	// _, err := os.Stat(filepath)
 	
-	if !os.IsNotExist(err) {
-		fmt.Println("账号已经存在!请换一个账号再注册")
+	// if !os.IsNotExist(err) {
+	// 	fmt.Println("账号已经存在!请换一个账号再注册")
+	// 	return
+	// }
+
+	if ok {
+		fmt.Println("账号已经存在!请更换一个用户名再注册")
 		return
 	}
 
 
-	newAccounts := NewAccount(user, pwd)
+	
+	newAccounts := NewAccount(user, utils.Hash(pwd))
 	data, _ := json.Marshal(newAccounts)
-	os.WriteFile("./accounts/" + user + ".json", data, 0666)
+	os.WriteFile(filepath, data, 0666)
 	
 	allAccounts[user] = newAccounts
+	fmt.Println(user, "注册成功")
+}
+
+//查看余额
+func (ac *Account)ShowBalance() {
+	fmt.Printf("你当前余额:%v元", ac.Balance)
+}
+
+//增加收入
+func (ac *Account)UpBalance() {
+	var (
+		amounts float64
+		message string
+	)
+	fmt.Print("请输入收入金额")
+	fmt.Scanln(&amounts)
+	fmt.Print("请输入收入缘由")
+	fmt.Scanln(&message)
+	ac.Balance += amounts
+	details := Detail {
+		Kind: "收入",
+		Amounts: amounts,
+		Message: message,
+	}
 	
+	ac.Details = append(ac.Details, details)
+	filepath := path.Join("accounts", fmt.Sprint(ac.Name, ".json"))
+	data, _ := json.Marshal(ac)
+	os.WriteFile(filepath, data, 0666)
+	fmt.Println("收入记录成功")
+}
 
+//支出
+func (ac *Account)DownBalance() {
+	var (
+		amounts float64
+		message string
+	)
+	fmt.Print("请输入支出金额")
+	fmt.Scanln(&amounts)
+	fmt.Print("请输入支出缘由")
+	fmt.Scanln(&message)
+	if ac.Balance > amounts {
+		fmt.Println("余额不足")
+		return
+	}
 
+	ac.Balance -= amounts
 
+	details := Detail {
+		Kind: "支出",
+		Amounts: amounts,
+		Message: message,
+	}
+	
+	ac.Details = append(ac.Details, details)
+	filepath := path.Join("accounts", fmt.Sprint(ac.Name, ".json"))
+	data, _ := json.Marshal(ac)
+	os.WriteFile(filepath, data, 0666)
+	fmt.Println("支出记录成功")
+}
+
+//查看明细
+func (ac *Account) ShowBalanceDetails() {
+
+	if len(ac.Details) == 0 {
+		fmt.Println("你当前没有收支记录")
+		return
+	}
+	fmt.Println("你的收支如下:")
+
+	for index, detail := range(ac.Details) {
+		fmt.Printf("(%d)%v\t\t%v\t\t%v", index + 1, detail.Kind, detail.Amounts, detail.Message)
+	}
 }
 
 func main() {
@@ -124,13 +214,13 @@ func main() {
 		case 2:
 			Register()
 		case 3:
-			fmt.Println("余额")
+			currentAccount.ShowBalance()
 		case 4:
-			fmt.Println("明细")
+			currentAccount.ShowBalanceDetails()
 		case 5:
-			fmt.Println("收入")
+			currentAccount.UpBalance()
 		case 6:
-			fmt.Println("支出")
+			currentAccount.DownBalance()
 		case 7:
 			fmt.Println("欢迎下次再来")
 			os.Exit(-1)
