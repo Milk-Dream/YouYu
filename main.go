@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	
 	"youyu/utils"
 )
 
@@ -25,6 +26,7 @@ type Account struct {
 	Pwd string `json:"pwd"`
 	Balance float64 `json:"balance"`
 	Details []Detail `json:"details"`
+	isLogin bool
 }
 
 var currentAccount Account
@@ -42,6 +44,29 @@ func NewAccount(name, pwd string) Account {
 //存放注册的账号
 var allAccounts = make(map[string]Account, 100)
 
+func (ac *Account) Filepath() string{
+	filepath := path.Join("accounts", fmt.Sprint(ac.Name, ".json"))
+	return filepath
+}
+
+func SaveAccount(account *Account) {
+	
+	data, _ := json.Marshal(account)
+	os.WriteFile(account.Filepath(), data, 0666)
+}
+
+func GetAccount(name string) *Account{
+	ok, filepath := utils.IsExists(name)
+	if !ok {
+		fmt.Println("用户名不存在")
+		return nil
+	}
+	accountJsons, _ := ioutil.ReadFile(filepath)
+	var account Account
+	json.Unmarshal(accountJsons, &account)
+	return &account
+
+}
 
 func Login() {
 	var (
@@ -55,13 +80,13 @@ func Login() {
 	fmt.Print("请输入密码:")
 	fmt.Scanln(&pwd)
 	//判断name是不是注册了
-	ok, filepath := utils.IsExists(name)
+	ok, _ := utils.IsExists(name)
 	if !ok {
 		fmt.Println("用户名不存在")
 		return
 	}
-	data, _ := ioutil.ReadFile(filepath)
-	json.Unmarshal(data, &account)
+	account = *GetAccount(name)
+	SaveAccount(&account)
 	currentAccount = account
 	/*account, ok := allAccounts[name]
 	if !ok {
@@ -73,6 +98,7 @@ func Login() {
 		fmt.Println("密码不正确...")
 		return
 	}
+	account.isLogin = true
 
 	fmt.Println("登录成功...")
 }
@@ -95,7 +121,7 @@ func Register() {
 		fmt.Println("两次密码输入不一致~请重新输入")
 		return
 	}
-	ok, filepath := utils.IsExists(user)
+	//ok, _ := utils.IsExists(user)
 
 	// filepath := "./accounts/" + user + ".json"
 	// _, err := os.Stat(filepath)
@@ -105,16 +131,15 @@ func Register() {
 	// 	return
 	// }
 
-	if ok {
-		fmt.Println("账号已经存在!请更换一个用户名再注册")
-		return
+	
+
+	account := GetAccount(user)
+	if account != nil {
+		fmt.Println("当前账号不存在")
 	}
-
-
 	
 	newAccounts := NewAccount(user, utils.Hash(pwd))
-	data, _ := json.Marshal(newAccounts)
-	os.WriteFile(filepath, data, 0666)
+	SaveAccount(&newAccounts)
 	
 	allAccounts[user] = newAccounts
 	fmt.Println(user, "注册成功")
@@ -122,11 +147,19 @@ func Register() {
 
 //查看余额
 func (ac *Account)ShowBalance() {
+	if !ac.isLogin {
+		fmt.Println("请先登录再操作")
+		return
+	}
 	fmt.Printf("你当前余额:%v元", ac.Balance)
 }
 
 //增加收入
 func (ac *Account)UpBalance() {
+	if !ac.isLogin {
+		fmt.Println("请先登录再操作")
+		return
+	}
 	var (
 		amounts float64
 		message string
@@ -151,6 +184,10 @@ func (ac *Account)UpBalance() {
 
 //支出
 func (ac *Account)DownBalance() {
+	if !ac.isLogin {
+		fmt.Println("请先登录再操作")
+		return
+	}
 	var (
 		amounts float64
 		message string
@@ -181,6 +218,10 @@ func (ac *Account)DownBalance() {
 
 //查看明细
 func (ac *Account) ShowBalanceDetails() {
+	if !ac.isLogin {
+		fmt.Println("请先登录再操作")
+		return
+	}
 
 	if len(ac.Details) == 0 {
 		fmt.Println("你当前没有收支记录")
