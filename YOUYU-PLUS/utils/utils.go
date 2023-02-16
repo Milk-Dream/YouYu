@@ -28,3 +28,6 @@ func Hash(str string) string{
 	return ret
 }
 
+func Add(x, y int) int {
+	return x + y
+}

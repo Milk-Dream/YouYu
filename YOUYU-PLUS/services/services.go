@@ -2,11 +2,42 @@ package services
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"path"
 	"youyu/YOUYU-PLUS/models"
 	"youyu/YOUYU-PLUS/utils"
 )
 
 var currentAccount *models.Account
+
+var (
+	Info *log.Logger //重要的日志-常规信息
+	Warning *log.Logger //警告信息
+	Error *log.Logger //一般错误
+	Fatil *log.Logger//严重错误
+)
+
+func init() {
+	log.SetPrefix("[XIAOHEI]")
+	log.SetFlags(log.LstdFlags|log.Lmicroseconds|log.Llongfile)
+	logpath := path.Join("log","youyu.log")
+	file, err := os.OpenFile(logpath, os.O_CREATE|os.O_WRONLY|os.O_APPEND,0666)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	log.SetOutput(file)
+	//日志分解设置
+	Info = log.New(file, "[INFO]", log.LstdFlags|log.Lmicroseconds|log.Llongfile)
+	Warning = log.New(file, "[WARNING]", log.LstdFlags|log.Lmicroseconds|log.Llongfile)
+	Error = log.New(file, "[ERROR]", log.LstdFlags|log.Lmicroseconds|log.Llongfile)
+	Fatil = log.New(file, "[FATIL]", log.LstdFlags|log.Lmicroseconds|log.Llongfile)
+	
+
+
+}
+
 
 //登录
 func LoginServices(name, pwd string) (string, bool, *models.Account){
@@ -31,7 +62,7 @@ func LoginServices(name, pwd string) (string, bool, *models.Account){
 	}
 	//account.isLogin = true
 	currentAccount = &account
-	
+	log.Println(account.Name+"登录成功")
 	return "登录成功", true, &account
 }
 
@@ -94,6 +125,7 @@ func DownBalanceServices(amounts float64, message string) (string, bool) {
 	}
 	if currentAccount.Balance > amounts {
 		//fmt.Println("余额不足")
+		Warning.Panicf("%v账号余额不足", currentAccount.Name)
 		return "账号余额不足", false
 	}
 	currentAccount.DownBalance(amounts, message)
